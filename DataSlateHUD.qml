@@ -1,5 +1,4 @@
-import QtQuick 2.15
-import QtQuick.Effects
+import QtQuick 2.0
 import SddmComponents 2.0
 
 Item {
@@ -85,23 +84,6 @@ Item {
                 font.pointSize: 16
                 font.bold: true
                 color: "#4af2ff"
-                
-                // Subtle text glow
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: parent.width + 4
-                    height: parent.height + 4
-                    color: "transparent"
-                    z: -1
-                    opacity: 0.3
-                    
-                    Text {
-                        anchors.centerIn: parent
-                        text: headerText.text
-                        font: headerText.font
-                        color: "#4af2ff"
-                    }
-                }
             }
             
             // System Status Indicator
@@ -115,7 +97,8 @@ Item {
                     height: 8
                     radius: 4
                     color: systemStatus === "SECURE" ? "#00ff41" : 
-                           systemStatus === "ALERT" ? "#ff4500" : "#ffff00"
+                           systemStatus === "ACCESS DENIED" ? "#ff4500" : 
+                           systemStatus === "ACCESS GRANTED" ? "#00ff41" : "#ffff00"
                     
                     SequentialAnimation on opacity {
                         running: systemStatus !== "SECURE"
