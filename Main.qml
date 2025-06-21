@@ -86,9 +86,6 @@ Rectangle {
         onRebootRequested: {
             sddm.reboot()
         }
-        
-        // Simulate hardware key detection
-        hardwareKeyDetected: Math.random() > 0.5
     }
     
     // Hidden session selector (keep for compatibility)
@@ -101,10 +98,7 @@ Rectangle {
     
     // Focus management
     Component.onCompleted: {
-        if (dataSlateHUD.username === "") {
-            // Focus on username field
-        } else {
-            // Focus on password field
-        }
+        // Focus on the HUD when loaded
+        dataSlateHUD.forceActiveFocus()
     }
 }
