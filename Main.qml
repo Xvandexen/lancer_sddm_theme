@@ -1,4 +1,4 @@
-import QtQuick 2.15
+import QtQuick 2.0
 import SddmComponents 2.0
 
 Rectangle {
@@ -14,24 +14,10 @@ Rectangle {
         target: sddm
         onLoginSucceeded: {
             dataSlateHUD.systemStatus = "ACCESS GRANTED"
-            // Add success animation here later
         }
-    
-    // Timer for resetting failed authentication state
-    Timer {
-        id: failedTimer
-        interval: 2000
-        onTriggered: {
-            dataSlateHUD.authenticationFailed = false
-            dataSlateHUD.systemStatus = "SECURE"
-        }
-    }
         onLoginFailed: {
             dataSlateHUD.authenticationFailed = true
             dataSlateHUD.systemStatus = "ACCESS DENIED"
-            
-            // Reset failed state after animation
-            failedTimer.start()
         }
     }
     
@@ -89,7 +75,7 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         
         // Connect HUD signals to SDDM actions
-        onLoginRequested: function(username, password) {
+        onLoginRequested: {
             sddm.login(username, password, sessionIndex)
         }
         
@@ -102,7 +88,6 @@ Rectangle {
         }
         
         // Simulate hardware key detection
-        // In real implementation, this would check for actual hardware
         hardwareKeyDetected: Math.random() > 0.5
     }
     
@@ -116,9 +101,10 @@ Rectangle {
     
     // Focus management
     Component.onCompleted: {
-        if (dataSlateHUD.username === "")
-            dataSlateHUD.children[1].children[1].children[1].children[1].children[1].focus = true
-        else
-            dataSlateHUD.children[1].children[1].children[2].children[1].children[1].focus = true
+        if (dataSlateHUD.username === "") {
+            // Focus on username field
+        } else {
+            // Focus on password field
+        }
     }
 }
