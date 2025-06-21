@@ -1,10 +1,10 @@
-import QtQuick 2.0
+import QtQuick 2.15
 import SddmComponents 2.0
 
 Rectangle {
     width: Screen.width
     height: Screen.height
-    color: "#1e1e2e"
+    color: "#0a0a0a"
     
     property int sessionIndex: session.index
     
@@ -13,67 +13,100 @@ Rectangle {
     Connections {
         target: sddm
         onLoginSucceeded: {
+            dataSlateHUD.systemStatus = "ACCESS GRANTED"
+            // Add success animation here later
         }
+    
+    // Timer for resetting failed authentication state
+    Timer {
+        id: failedTimer
+        interval: 2000
+        onTriggered: {
+            dataSlateHUD.authenticationFailed = false
+            dataSlateHUD.systemStatus = "SECURE"
+        }
+    }
         onLoginFailed: {
-            pw_entry.text = ""
+            dataSlateHUD.authenticationFailed = true
+            dataSlateHUD.systemStatus = "ACCESS DENIED"
+            
+            // Reset failed state after animation
+            failedTimer.start()
         }
     }
     
+    // Temporary background - will be replaced with bunker door
     Rectangle {
-        width: 400
-        height: 300
-        color: "#313244"
-        radius: 12
-        anchors.centerIn: parent
+        anchors.fill: parent
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: "#1a1a2e" }
+            GradientStop { position: 0.5; color: "#16213e" }
+            GradientStop { position: 1.0; color: "#0f1419" }
+        }
         
-        Column {
-            anchors.centerIn: parent
-            spacing: 20
-            
-            TextBox {
-                id: user_entry
-                width: 300
-                height: 40
-                text: userModel.lastUser
-                font.pixelSize: 16
-                KeyNavigation.tab: pw_entry
-            }
-            
-            PasswordBox {
-                id: pw_entry
-                width: 300
-                height: 40
-                font.pixelSize: 16
-                KeyNavigation.backtab: user_entry
-                Keys.onPressed: {
-                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        sddm.login(user_entry.text, pw_entry.text, sessionIndex)
-                        event.accepted = true
-                    }
-                }
-            }
-            
+        // Add some subtle grid pattern for sci-fi feel
+        Repeater {
+            model: 20
             Rectangle {
-                width: 300
-                height: 40
-                color: "#cba6f7"
-                radius: 8
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: "Login"
-                    color: "#11111b"
-                    font.bold: true
-                }
-                
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: sddm.login(user_entry.text, pw_entry.text, sessionIndex)
-                }
+                width: parent.width
+                height: 1
+                y: index * (parent.height / 20)
+                color: "#ffffff"
+                opacity: 0.02
+            }
+        }
+        
+        Repeater {
+            model: 30
+            Rectangle {
+                width: 1
+                height: parent.height
+                x: index * (parent.width / 30)
+                color: "#ffffff"
+                opacity: 0.02
             }
         }
     }
     
+    // Large "LANCER" text in background
+    Text {
+        anchors.centerIn: parent
+        anchors.verticalCenterOffset: -100
+        text: "LANCER"
+        font.family: "monospace"
+        font.pointSize: 120
+        font.bold: true
+        color: "#ffffff"
+        opacity: 0.03
+        transform: Rotation { angle: -15 }
+    }
+    
+    // DataSlate HUD positioned on the right
+    DataSlateHUD {
+        id: dataSlateHUD
+        anchors.right: parent.right
+        anchors.rightMargin: 50
+        anchors.verticalCenter: parent.verticalCenter
+        
+        // Connect HUD signals to SDDM actions
+        onLoginRequested: function(username, password) {
+            sddm.login(username, password, sessionIndex)
+        }
+        
+        onPowerOffRequested: {
+            sddm.powerOff()
+        }
+        
+        onRebootRequested: {
+            sddm.reboot()
+        }
+        
+        // Simulate hardware key detection
+        // In real implementation, this would check for actual hardware
+        hardwareKeyDetected: Math.random() > 0.5
+    }
+    
+    // Hidden session selector (keep for compatibility)
     ComboBox {
         id: session
         visible: false
@@ -81,10 +114,11 @@ Rectangle {
         index: sessionModel.lastIndex
     }
     
+    // Focus management
     Component.onCompleted: {
-        if (user_entry.text === "")
-            user_entry.focus = true
+        if (dataSlateHUD.username === "")
+            dataSlateHUD.children[1].children[1].children[1].children[1].children[1].focus = true
         else
-            pw_entry.focus = true
+            dataSlateHUD.children[1].children[1].children[2].children[1].children[1].focus = true
     }
 }
