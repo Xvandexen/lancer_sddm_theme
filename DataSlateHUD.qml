@@ -11,10 +11,46 @@ Item {
     property bool authenticationFailed: false
     property bool bootComplete: false
     property int bootStep: 0
+    property string currentTypingText: ""
+    property int typingIndex: 0
+    property bool isTyping: false
     
     signal loginRequested(string username, string password)
     signal powerOffRequested()
     signal rebootRequested()
+    
+    // Typing animation function
+    function startTyping(text) {
+        if (!bootComplete) return
+        currentTypingText = text
+        typingIndex = 0
+        isTyping = true
+        hoverFeedback.text = ""
+        typingTimer.start()
+    }
+    
+    function stopTyping() {
+        if (!bootComplete) return
+        typingTimer.stop()
+        isTyping = false
+        hoverFeedback.text = ""
+    }
+    
+    // Typing timer
+    Timer {
+        id: typingTimer
+        interval: 30
+        repeat: true
+        onTriggered: {
+            if (typingIndex < currentTypingText.length) {
+                hoverFeedback.text += currentTypingText.charAt(typingIndex)
+                typingIndex++
+            } else {
+                stop()
+                isTyping = false
+            }
+        }
+    }
     
     // Single unified HUD unit with enhanced steel frame
     Rectangle {
@@ -340,6 +376,17 @@ Item {
                             font.bold: true
                             visible: bootStep >= 7
                         }
+                        
+                        // Hover feedback messages - typing animation
+                        Text {
+                            id: hoverFeedback
+                            width: parent.width
+                            text: ""
+                            font.family: "Courier New, monospace"
+                            font.pixelSize: 14  // Normal size like other console text
+                            color: "#a0cfff"
+                            visible: text !== "" && bootComplete
+                        }
                     }
                 }
                 
@@ -384,9 +431,21 @@ Item {
                             width: 300
                             height: 28
                             radius: 4
-                            color: "#1a1e2180"
-                            border.width: 1
-                            border.color: usernameInput.activeFocus ? "#a0cfff" : "#4a4f55"
+                            color: usernameInput.activeFocus || (usernameMouseArea.containsMouse && bootComplete) ? "#2a3e4d80" : "#1a1e2180"
+                            border.width: usernameInput.activeFocus || (usernameMouseArea.containsMouse && bootComplete) ? 2 : 1
+                            border.color: usernameInput.activeFocus ? "#a0cfff" : 
+                                         (usernameMouseArea.containsMouse && bootComplete) ? "#7bb8e8" : "#4a4f55"
+                            
+                            // Subtle glow effect on hover/focus
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: parent.radius
+                                color: "transparent"
+                                border.width: usernameInput.activeFocus || (usernameMouseArea.containsMouse && bootComplete) ? 1 : 0
+                                border.color: "#a0cfff"
+                                opacity: 0.3
+                                visible: usernameInput.activeFocus || (usernameMouseArea.containsMouse && bootComplete)
+                            }
                             
                             TextInput {
                                 id: usernameInput
@@ -398,6 +457,33 @@ Item {
                                 verticalAlignment: TextInput.AlignVCenter
                                 selectByMouse: true
                                 KeyNavigation.tab: passwordInput
+                                
+                                onActiveFocusChanged: {
+                                    if (activeFocus && bootComplete) {
+                                        startTyping("Input buffer active: USERNAME field selected")
+                                    } else if (!passwordInput.activeFocus) {
+                                        stopTyping()
+                                    }
+                                }
+                            }
+                            
+                            MouseArea {
+                                id: usernameMouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: usernameInput.forceActiveFocus()
+                                
+                                onEntered: {
+                                    if (!usernameInput.activeFocus && bootComplete && !isTyping) {
+                                        startTyping("Hovering: USERNAME input field - click to activate")
+                                    }
+                                }
+                                
+                                onExited: {
+                                    if (!usernameInput.activeFocus) {
+                                        stopTyping()
+                                    }
+                                }
                             }
                         }
                     }
@@ -420,10 +506,22 @@ Item {
                             width: 300
                             height: 28
                             radius: 4
-                            color: "#1a1e2180"
-                            border.width: 1
+                            color: passwordInput.activeFocus || (passwordMouseArea.containsMouse && bootComplete) ? "#2a3e4d80" : "#1a1e2180"
+                            border.width: passwordInput.activeFocus || (passwordMouseArea.containsMouse && bootComplete) ? 2 : 1
                             border.color: authenticationFailed ? "#ff5c5c" : 
-                                         passwordInput.activeFocus ? "#a0cfff" : "#4a4f55"
+                                         passwordInput.activeFocus ? "#a0cfff" :
+                                         (passwordMouseArea.containsMouse && bootComplete) ? "#7bb8e8" : "#4a4f55"
+                            
+                            // Subtle glow effect on hover/focus
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: parent.radius
+                                color: "transparent"
+                                border.width: passwordInput.activeFocus || (passwordMouseArea.containsMouse && bootComplete) ? 1 : 0
+                                border.color: authenticationFailed ? "#ff5c5c" : "#a0cfff"
+                                opacity: 0.3
+                                visible: passwordInput.activeFocus || (passwordMouseArea.containsMouse && bootComplete)
+                            }
                             
                             TextInput {
                                 id: passwordInput
@@ -442,6 +540,33 @@ Item {
                                     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                                         mechHUD.loginRequested(usernameInput.text, passwordInput.text)
                                         event.accepted = true
+                                    }
+                                }
+                                
+                                onActiveFocusChanged: {
+                                    if (activeFocus && bootComplete) {
+                                        startTyping("Input buffer active: PASSWORD field selected - press ENTER to authenticate")
+                                    } else if (!usernameInput.activeFocus) {
+                                        stopTyping()
+                                    }
+                                }
+                            }
+                            
+                            MouseArea {
+                                id: passwordMouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: passwordInput.forceActiveFocus()
+                                
+                                onEntered: {
+                                    if (!passwordInput.activeFocus && bootComplete && !isTyping) {
+                                        startTyping("Hovering: PASSWORD input field - click to activate")
+                                    }
+                                }
+                                
+                                onExited: {
+                                    if (!passwordInput.activeFocus) {
+                                        stopTyping()
                                     }
                                 }
                             }
@@ -548,12 +673,24 @@ Item {
                         }
                         
                         Rectangle {
+                            id: loginButton
                             width: parent.width
                             height: 30
                             radius: 4
-                            color: "#4f83aa60"
-                            border.width: 1
-                            border.color: "#a0cfff"
+                            color: (loginMouseArea.containsMouse && bootComplete) ? "#6b9bd480" : "#4f83aa60"
+                            border.width: (loginMouseArea.containsMouse && bootComplete) ? 2 : 1
+                            border.color: (loginMouseArea.containsMouse && bootComplete) ? "#b8e0ff" : "#a0cfff"
+                            
+                            // Glow effect on hover
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: parent.radius
+                                color: "transparent"
+                                border.width: (loginMouseArea.containsMouse && bootComplete) ? 1 : 0
+                                border.color: "#a0cfff"
+                                opacity: 0.5
+                                visible: (loginMouseArea.containsMouse && bootComplete)
+                            }
                             
                             Text {
                                 anchors.centerIn: parent
@@ -561,12 +698,26 @@ Item {
                                 font.family: "Courier New, monospace"
                                 font.pixelSize: 12
                                 font.bold: true
-                                color: "#a0cfff"
+                                color: (loginMouseArea.containsMouse && bootComplete) ? "#ffffff" : "#a0cfff"
                             }
                             
                             MouseArea {
+                                id: loginMouseArea
                                 anchors.fill: parent
+                                hoverEnabled: true
                                 onClicked: mechHUD.loginRequested(usernameInput.text, passwordInput.text)
+                                
+                                onEntered: {
+                                    if (bootComplete && !isTyping) {
+                                        startTyping("Hovering: LOGIN button - execute authentication sequence")
+                                    }
+                                }
+                                
+                                onExited: {
+                                    if (!usernameInput.activeFocus && !passwordInput.activeFocus) {
+                                        stopTyping()
+                                    }
+                                }
                             }
                         }
                         
@@ -575,12 +726,24 @@ Item {
                             spacing: 8
                             
                             Rectangle {
+                                id: shutdownButton
                                 width: (parent.width - 8) / 2
                                 height: 25
                                 radius: 3
-                                color: "#aa6a4f60"
-                                border.width: 1
-                                border.color: "#ffc266"  // Amber border for shutdown
+                                color: (shutdownMouseArea.containsMouse && bootComplete) ? "#cc7a5f80" : "#aa6a4f60"
+                                border.width: (shutdownMouseArea.containsMouse && bootComplete) ? 2 : 1
+                                border.color: (shutdownMouseArea.containsMouse && bootComplete) ? "#ffde99" : "#ffc266"
+                                
+                                // Warning glow effect on hover
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: parent.radius
+                                    color: "transparent"
+                                    border.width: (shutdownMouseArea.containsMouse && bootComplete) ? 1 : 0
+                                    border.color: "#ffc266"
+                                    opacity: 0.4
+                                    visible: (shutdownMouseArea.containsMouse && bootComplete)
+                                }
                                 
                                 Text {
                                     anchors.centerIn: parent
@@ -588,22 +751,48 @@ Item {
                                     font.family: "Courier New, monospace"
                                     font.pixelSize: 9
                                     font.bold: true
-                                    color: "#ffc266"  // Amber text for shutdown
+                                    color: (shutdownMouseArea.containsMouse && bootComplete) ? "#ffffff" : "#ffc266"
                                 }
                                 
                                 MouseArea {
+                                    id: shutdownMouseArea
                                     anchors.fill: parent
+                                    hoverEnabled: true
                                     onClicked: mechHUD.powerOffRequested()
+                                    
+                                    onEntered: {
+                                        if (bootComplete && !isTyping) {
+                                            startTyping("WARNING: SHUTDOWN command - system will power down")
+                                        }
+                                    }
+                                    
+                                    onExited: {
+                                        if (!usernameInput.activeFocus && !passwordInput.activeFocus) {
+                                            stopTyping()
+                                        }
+                                    }
                                 }
                             }
                             
                             Rectangle {
+                                id: rebootButton
                                 width: (parent.width - 8) / 2
                                 height: 25
                                 radius: 3
-                                color: "#aa8a4f60"
-                                border.width: 1
-                                border.color: "#ffc266"  // Amber border for reboot
+                                color: (rebootMouseArea.containsMouse && bootComplete) ? "#cc9a5f80" : "#aa8a4f60"
+                                border.width: (rebootMouseArea.containsMouse && bootComplete) ? 2 : 1
+                                border.color: (rebootMouseArea.containsMouse && bootComplete) ? "#ffde99" : "#ffc266"
+                                
+                                // Warning glow effect on hover
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: parent.radius
+                                    color: "transparent"
+                                    border.width: (rebootMouseArea.containsMouse && bootComplete) ? 1 : 0
+                                    border.color: "#ffc266"
+                                    opacity: 0.4
+                                    visible: (rebootMouseArea.containsMouse && bootComplete)
+                                }
                                 
                                 Text {
                                     anchors.centerIn: parent
@@ -611,12 +800,26 @@ Item {
                                     font.family: "Courier New, monospace"
                                     font.pixelSize: 9
                                     font.bold: true
-                                    color: "#ffc266"  // Amber text for reboot
+                                    color: (rebootMouseArea.containsMouse && bootComplete) ? "#ffffff" : "#ffc266"
                                 }
                                 
                                 MouseArea {
+                                    id: rebootMouseArea
                                     anchors.fill: parent
+                                    hoverEnabled: true
                                     onClicked: mechHUD.rebootRequested()
+                                    
+                                    onEntered: {
+                                        if (bootComplete && !isTyping) {
+                                            startTyping("WARNING: REBOOT command - system will restart")
+                                        }
+                                    }
+                                    
+                                    onExited: {
+                                        if (!usernameInput.activeFocus && !passwordInput.activeFocus) {
+                                            stopTyping()
+                                        }
+                                    }
                                 }
                             }
                         }
