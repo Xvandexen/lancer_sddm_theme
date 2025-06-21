@@ -28,6 +28,7 @@
           ];
           
           shellHook = ''
+            exec zsh
             echo "🎨 SDDM Theme Development Environment for Hyprland (Qt6)"
             echo "Starting with where-is-my-sddm-theme as base"
             echo ""
