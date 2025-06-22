@@ -14,6 +14,8 @@ Rectangle {
         target: sddm
         onLoginSucceeded: {
             dataSlateHUD.systemStatus = "ACCESS GRANTED"
+            // Start the bunker doors opening animation
+            bunkerDoors.startAnimation()
         }
         onLoginFailed: {
             dataSlateHUD.authenticationFailed = true
@@ -94,6 +96,16 @@ Rectangle {
         visible: false
         model: sessionModel
         index: sessionModel.lastIndex
+    }
+    
+    // Bunker Doors Opening Animation - loads above everything
+    BunkerDoorsOverlay {
+        id: bunkerDoors
+        
+        onAnimationComplete: {
+            // Animation is complete, session should be started by now
+            // If needed, we could add additional cleanup here
+        }
     }
     
     // Focus management

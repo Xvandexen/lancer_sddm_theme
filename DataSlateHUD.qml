@@ -9,20 +9,26 @@ Item {
     property alias username: usernameInput.text
     property alias password: passwordInput.text
     property bool authenticationFailed: false
-    property bool bootComplete: false
+    property bool bootComplete: true  // Changed to true for instant login
     property int bootStep: 0
     property string currentTypingText: ""
     property int typingIndex: 0
     property bool isTyping: false
     property var terminalHistory: []
+    property var typingQueue: []
     
     signal loginRequested(string username, string password)
     signal powerOffRequested()
     signal rebootRequested()
     
-    // Typing animation function
+    // Enhanced typing animation function with queue support
     function startTyping(text) {
-        if (!bootComplete || isTyping) return
+        // If currently typing, add to queue instead of blocking
+        if (isTyping) {
+            typingQueue.push(text)
+            return
+        }
+        
         currentTypingText = text
         typingIndex = 0
         isTyping = true
@@ -31,6 +37,17 @@ Item {
         terminalHistory.push("")
         updateTerminalDisplay()
         typingTimer.start()
+    }
+    
+    // Process next item in typing queue
+    function processNextTyping() {
+        if (typingQueue.length > 0) {
+            var nextText = typingQueue.shift()
+            // Small delay before starting next typing for readability
+            Qt.callLater(function() {
+                startTyping(nextText)
+            })
+        }
     }
     
     function updateTerminalDisplay() {
@@ -70,8 +87,7 @@ Item {
     }
     
     function stopTyping() {
-        if (!bootComplete) return
-        typingTimer.stop()
+        typingTimer.stop()  // Removed bootComplete check
         isTyping = false
     }
     
@@ -92,6 +108,9 @@ Item {
                 // Final update to ensure complete text
                 terminalHistory[terminalHistory.length - 1] = currentTypingText
                 updateTerminalDisplay()
+                
+                // Process next item in queue after a brief pause
+                Qt.callLater(processNextTyping)
             }
         }
     }
@@ -108,7 +127,7 @@ Item {
         spacing: 15
         
         HeaderSection {
-            bootComplete: mechHUD.bootComplete
+            bootComplete: true  // Always show as ready
         }
         
         // Divider line
@@ -144,7 +163,7 @@ Item {
                     font.family: "Courier New, monospace"
                     font.pixelSize: 14
                     color: "#a0cfff"  // Commands in original blue
-                    visible: text !== "" && bootComplete
+                    visible: text !== ""  // Always visible if there's text
                     wrapMode: Text.Wrap
                     textFormat: Text.RichText  // Enable rich text for color coding
                 }
@@ -157,13 +176,12 @@ Item {
             height: 1
             color: "#a0cfff"
             opacity: 0.3
-            visible: bootStep >= 7
         }        
-        // Authentication Section
+        // Authentication Section - Now always visible
         Column {
             width: parent.width
             spacing: 15
-            visible: bootStep >= 7
+            // Removed visible: bootStep >= 7
             
             Text {
                 text: "PILOT AUTHENTICATION"
@@ -191,20 +209,20 @@ Item {
                     width: 300
                     height: 28
                     radius: 4
-                    color: usernameInput.activeFocus || (usernameMouseArea.containsMouse && bootComplete) ? "#2a3e4d80" : "#1a1e2180"
-                    border.width: usernameInput.activeFocus || (usernameMouseArea.containsMouse && bootComplete) ? 2 : 1
+                    color: usernameInput.activeFocus || usernameMouseArea.containsMouse ? "#2a3e4d80" : "#1a1e2180"
+                    border.width: usernameInput.activeFocus || usernameMouseArea.containsMouse ? 2 : 1
                     border.color: usernameInput.activeFocus ? "#a0cfff" : 
-                                 (usernameMouseArea.containsMouse && bootComplete) ? "#7bb8e8" : "#4a4f55"
+                                 usernameMouseArea.containsMouse ? "#7bb8e8" : "#4a4f55"
                     
                     // Subtle glow effect on hover/focus
                     Rectangle {
                         anchors.fill: parent
                         radius: parent.radius
                         color: "transparent"
-                        border.width: usernameInput.activeFocus || (usernameMouseArea.containsMouse && bootComplete) ? 1 : 0
+                        border.width: usernameInput.activeFocus || usernameMouseArea.containsMouse ? 1 : 0
                         border.color: "#a0cfff"
                         opacity: 0.3
-                        visible: usernameInput.activeFocus || (usernameMouseArea.containsMouse && bootComplete)
+                        visible: usernameInput.activeFocus || usernameMouseArea.containsMouse
                     }
                     
                     TextInput {
@@ -219,7 +237,7 @@ Item {
                         KeyNavigation.tab: passwordInput
                         
                         onActiveFocusChanged: {
-                            if (activeFocus && bootComplete) {
+                            if (activeFocus) {
                                 startTyping("$ gms-cc-subsys --init-input-buffer username")
                             }
                         }
@@ -232,7 +250,7 @@ Item {
                         onClicked: usernameInput.forceActiveFocus()
                         
                         onEntered: {
-                            if (!usernameInput.activeFocus && bootComplete && !isTyping) {
+                            if (!usernameInput.activeFocus && !isTyping) {
                                 startTyping("$ hover-detect auth-field --type=username")
                             }
                         }
@@ -262,21 +280,21 @@ Item {
                     width: 300
                     height: 28
                     radius: 4
-                    color: passwordInput.activeFocus || (passwordMouseArea.containsMouse && bootComplete) ? "#2a3e4d80" : "#1a1e2180"
-                    border.width: passwordInput.activeFocus || (passwordMouseArea.containsMouse && bootComplete) ? 2 : 1
+                    color: passwordInput.activeFocus || passwordMouseArea.containsMouse ? "#2a3e4d80" : "#1a1e2180"
+                    border.width: passwordInput.activeFocus || passwordMouseArea.containsMouse ? 2 : 1
                     border.color: authenticationFailed ? "#ff5c5c" : 
                                  passwordInput.activeFocus ? "#a0cfff" :
-                                 (passwordMouseArea.containsMouse && bootComplete) ? "#7bb8e8" : "#4a4f55"
+                                 passwordMouseArea.containsMouse ? "#7bb8e8" : "#4a4f55"
                     
                     // Subtle glow effect on hover/focus
                     Rectangle {
                         anchors.fill: parent
                         radius: parent.radius
                         color: "transparent"
-                        border.width: passwordInput.activeFocus || (passwordMouseArea.containsMouse && bootComplete) ? 1 : 0
+                        border.width: passwordInput.activeFocus || passwordMouseArea.containsMouse ? 1 : 0
                         border.color: authenticationFailed ? "#ff5c5c" : "#a0cfff"
                         opacity: 0.3
-                        visible: passwordInput.activeFocus || (passwordMouseArea.containsMouse && bootComplete)
+                        visible: passwordInput.activeFocus || passwordMouseArea.containsMouse
                     }
                     
                     TextInput {
@@ -300,7 +318,7 @@ Item {
                         }
                         
                         onActiveFocusChanged: {
-                            if (activeFocus && bootComplete) {
+                            if (activeFocus) {
                                 startTyping("$ gms-cc-subsys --init-input-buffer password --encrypted")
                             }
                         }
@@ -313,7 +331,7 @@ Item {
                         onClicked: passwordInput.forceActiveFocus()
                         
                         onEntered: {
-                            if (!passwordInput.activeFocus && bootComplete && !isTyping) {
+                            if (!passwordInput.activeFocus && !isTyping) {
                                 startTyping("$ hover-detect auth-field --type=password --secure")
                             }
                         }
@@ -460,19 +478,19 @@ AuthenticationChecklist {
                     width: parent.width
                     height: 30
                     radius: 4
-                    color: (loginMouseArea.containsMouse && bootComplete) ? "#6b9bd480" : "#4f83aa60"
-                    border.width: (loginMouseArea.containsMouse && bootComplete) ? 2 : 1
-                    border.color: (loginMouseArea.containsMouse && bootComplete) ? "#b8e0ff" : "#a0cfff"
+                    color: loginMouseArea.containsMouse ? "#6b9bd480" : "#4f83aa60"
+                    border.width: loginMouseArea.containsMouse ? 2 : 1
+                    border.color: loginMouseArea.containsMouse ? "#b8e0ff" : "#a0cfff"
                     
                     // Glow effect on hover
                     Rectangle {
                         anchors.fill: parent
                         radius: parent.radius
                         color: "transparent"
-                        border.width: (loginMouseArea.containsMouse && bootComplete) ? 1 : 0
+                        border.width: loginMouseArea.containsMouse ? 1 : 0
                         border.color: "#a0cfff"
                         opacity: 0.5
-                        visible: (loginMouseArea.containsMouse && bootComplete)
+                        visible: loginMouseArea.containsMouse
                     }
                     
                     Text {
@@ -481,7 +499,7 @@ AuthenticationChecklist {
                         font.family: "Courier New, monospace"
                         font.pixelSize: 12
                         font.bold: true
-                        color: (loginMouseArea.containsMouse && bootComplete) ? "#ffffff" : "#a0cfff"
+                        color: loginMouseArea.containsMouse ? "#ffffff" : "#a0cfff"
                     }
                     
                     MouseArea {
@@ -491,7 +509,7 @@ AuthenticationChecklist {
                         onClicked: mechHUD.loginRequested(usernameInput.text, passwordInput.text)
                         
                         onEntered: {
-                            if (bootComplete && !isTyping) {
+                            if (!isTyping) {
                                 startTyping("$ omninet-auth --execute --pilot=" + (usernameInput.text || "[NULL]"))
                             }
                         }
@@ -511,18 +529,18 @@ AuthenticationChecklist {
                         width: (parent.width - 8) / 2
                         height: 25
                         radius: 3
-                        color: (shutdownMouseArea.containsMouse && bootComplete) ? "#cc7a5f80" : "#aa6a4f60"
-                        border.width: (shutdownMouseArea.containsMouse && bootComplete) ? 2 : 1
-                        border.color: (shutdownMouseArea.containsMouse && bootComplete) ? "#ffde99" : "#ffc266"
+                        color: shutdownMouseArea.containsMouse ? "#cc7a5f80" : "#aa6a4f60"
+                        border.width: shutdownMouseArea.containsMouse ? 2 : 1
+                        border.color: shutdownMouseArea.containsMouse ? "#ffde99" : "#ffc266"
                         
                         // Warning glow effect on hover
                         Rectangle {
                             anchors.fill: parent
                             radius: parent.radius
                             color: "transparent"
-                            border.width: (shutdownMouseArea.containsMouse && bootComplete) ? 1 : 0
+                            border.width: shutdownMouseArea.containsMouse ? 1 : 0
                             border.color: "#ffc266"
-                            visible: (shutdownMouseArea.containsMouse && bootComplete)
+                            visible: shutdownMouseArea.containsMouse
                         }
                         
                         Text {
@@ -531,7 +549,7 @@ AuthenticationChecklist {
                             font.family: "Courier New, monospace"
                             font.pixelSize: 9
                             font.bold: true
-                            color: (shutdownMouseArea.containsMouse && bootComplete) ? "#ffffff" : "#ffc266"
+                            color: shutdownMouseArea.containsMouse ? "#ffffff" : "#ffc266"
                         }
                         
                         MouseArea {
@@ -541,7 +559,7 @@ AuthenticationChecklist {
                             onClicked: mechHUD.powerOffRequested()
                             
                             onEntered: {
-                                if (bootComplete && !isTyping) {
+                                if (!isTyping) {
                                     startTyping("$ gms-power-mgmt --shutdown --emergency")
                                 }
                             }
@@ -557,19 +575,19 @@ AuthenticationChecklist {
                         width: (parent.width - 8) / 2
                         height: 25
                         radius: 3
-                        color: (rebootMouseArea.containsMouse && bootComplete) ? "#cc9a5f80" : "#aa8a4f60"
-                        border.width: (rebootMouseArea.containsMouse && bootComplete) ? 2 : 1
-                        border.color: (rebootMouseArea.containsMouse && bootComplete) ? "#ffde99" : "#ffc266"
+                        color: rebootMouseArea.containsMouse ? "#cc9a5f80" : "#aa8a4f60"
+                        border.width: rebootMouseArea.containsMouse ? 2 : 1
+                        border.color: rebootMouseArea.containsMouse ? "#ffde99" : "#ffc266"
                         
                         // Warning glow effect on hover
                         Rectangle {
                             anchors.fill: parent
                             radius: parent.radius
                             color: "transparent"
-                            border.width: (rebootMouseArea.containsMouse && bootComplete) ? 1 : 0
+                            border.width: rebootMouseArea.containsMouse ? 1 : 0
                             border.color: "#ffc266"
                             opacity: 0.4
-                            visible: (rebootMouseArea.containsMouse && bootComplete)
+                            visible: rebootMouseArea.containsMouse
                         }
                         
                         Text {
@@ -578,7 +596,7 @@ AuthenticationChecklist {
                             font.family: "Courier New, monospace"
                             font.pixelSize: 9
                             font.bold: true
-                            color: (rebootMouseArea.containsMouse && bootComplete) ? "#ffffff" : "#ffc266"
+                            color: rebootMouseArea.containsMouse ? "#ffffff" : "#ffc266"
                         }
                         
                         MouseArea {
@@ -588,7 +606,7 @@ AuthenticationChecklist {
                             onClicked: mechHUD.rebootRequested()
                             
                             onEntered: {
-                                if (bootComplete && !isTyping) {
+                                if (!isTyping) {
                                     startTyping("$ gms-power-mgmt --reboot --safe-init")
                                 }
                             }
@@ -603,7 +621,7 @@ AuthenticationChecklist {
         }
     }
 
-    // Boot sequence animation
+    // Boot sequence animation - now runs in background for flavor only
     SequentialAnimation {
         id: bootSequence
         running: true
@@ -621,6 +639,6 @@ AuthenticationChecklist {
         PauseAnimation { duration: 400 }
         ScriptAction { script: bootStep = 6 }
         PauseAnimation { duration: 300 }
-        ScriptAction { script: { bootStep = 7; bootComplete = true } }
+        ScriptAction { script: bootStep = 7 }
     }
 }
