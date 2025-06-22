@@ -10,26 +10,22 @@ Rectangle {
     
     TextConstants { id: textConstants }
     
-   Connections {
-    target: sddm
-    onLoginStarted: {
-        console.log("LOGIN STARTED - Starting bunker doors animation")
-        dataSlateHUD.systemStatus = "AUTHENTICATING..."
-        bunkerDoors.startAnimation()
+    Connections {
+        target: sddm
+        onLoginSucceeded: {
+            console.log("LOGIN SUCCEEDED - continuing doors animation")
+            dataSlateHUD.systemStatus = "ACCESS GRANTED"
+            // Animation continues to completion
+        }
+        onLoginFailed: {
+            console.log("LOGIN FAILED - stopping and resetting doors")
+            dataSlateHUD.authenticationFailed = true
+            dataSlateHUD.systemStatus = "ACCESS DENIED"
+            // Stop and reset the doors animation
+            bunkerDoors.abortAnimation()
+        }
     }
-    onLoginSucceeded: {
-        console.log("LOGIN SUCCEEDED")
-        dataSlateHUD.systemStatus = "ACCESS GRANTED"
-        // Animation continues to completion
-    }
-    onLoginFailed: {
-        console.log("LOGIN FAILED - Stopping/resetting bunker doors")
-        dataSlateHUD.authenticationFailed = true
-        dataSlateHUD.systemStatus = "ACCESS DENIED"
-        // Stop animation and reset doors
-        bunkerDoors.resetDoors()
-    }
-}    
+    
     // Temporary background - will be replaced with bunker door
     Rectangle {
         anchors.fill: parent
@@ -85,7 +81,11 @@ Rectangle {
         
         // Connect HUD signals to SDDM actions
         onLoginRequested: {
-            sddm.login(username, password, sessionIndex)
+            console.log("Login requested - starting doors animation")
+            // Start animation BEFORE calling sddm.login
+            bunkerDoors.startAnimation()
+            // Brief delay then trigger actual login
+            loginDelayTimer.start()
         }
         
         onPowerOffRequested: {
@@ -94,6 +94,30 @@ Rectangle {
         
         onRebootRequested: {
             sddm.reboot()
+        }
+        
+        // Store login credentials for delayed execution
+        property string pendingUsername: ""
+        property string pendingPassword: ""
+        
+        // Timer to delay actual login call after animation starts
+        Timer {
+            id: loginDelayTimer
+            interval: 500  // Half second delay for animation to start
+            onTriggered: {
+                console.log("Executing delayed login")
+                sddm.login(dataSlateHUD.pendingUsername, dataSlateHUD.pendingPassword, sessionIndex)
+            }
+        }
+    }
+    
+    // Update the login signal connection to store credentials
+    Connections {
+        target: dataSlateHUD
+        onLoginRequested: {
+            // Store credentials for delayed execution
+            dataSlateHUD.pendingUsername = username
+            dataSlateHUD.pendingPassword = password
         }
     }
     
@@ -119,13 +143,15 @@ Rectangle {
     Component.onCompleted: {
         // Focus on the HUD when loaded
         dataSlateHUD.forceActiveFocus()
+        console.log("Lancer theme loaded - Press F12 to test bunker doors")
     }
-        // Add this after the Component.onCompleted block
-Keys.onPressed: {
-    if (event.key === Qt.Key_F12) {
-        console.log("F12 pressed - Testing bunker doors animation")
-        bunkerDoors.startAnimation()
-        event.accepted = true
+    
+    // Test trigger for debugging
+    Keys.onPressed: {
+        if (event.key === Qt.Key_F12) {
+            console.log("F12 pressed - Testing bunker doors animation")
+            bunkerDoors.startAnimation()
+            event.accepted = true
+        }
     }
-}
 }

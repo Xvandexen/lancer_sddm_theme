@@ -12,22 +12,20 @@ Item {
     property bool animationActive: false
     
     signal animationComplete()
-
-function resetDoors() {
-    console.log("BunkerDoors: Resetting after failed login")
-    doorsOpeningAnimation.stop()
-    visible = false
-    animationActive = false
-    opacity = 1.0
-    // Reset door positions
-    leftDoor.x = 0
-    rightDoor.x = parent.width / 2 - 2
-    statusOverlay.opacity = 0.9
-}    
+    
     function startAnimation() {
+        console.log("BunkerDoors: Starting animation")
         visible = true
         animationActive = true
         doorsOpeningAnimation.start()
+    }
+    
+    function abortAnimation() {
+        console.log("BunkerDoors: Aborting animation due to login failure")
+        doorsOpeningAnimation.stop()
+        
+        // Quick "slam shut" animation back to closed
+        doorCloseAnimation.start()
     }
     
     // Background behind doors (in case desktop isn't loaded yet)
@@ -207,11 +205,11 @@ function resetDoors() {
         Text {
             id: statusText
             anchors.centerIn: parent
-            text: "ACCESS GRANTED"
+            text: "AUTHENTICATING..."
             font.family: "Courier New, monospace"
             font.pixelSize: 24
             font.bold: true
-            color: "#4ade80"  // Green for success
+            color: "#ffc266"  // Yellow for authenticating
         }
         
         // Pulsing effect
@@ -223,18 +221,29 @@ function resetDoors() {
         }
     }
     
-    // Door opening animation
+    // Door opening animation (success path)
     SequentialAnimation {
         id: doorsOpeningAnimation
         
-        // Brief pause to show "ACCESS GRANTED"
+        // Brief pause to show "AUTHENTICATING"
         PauseAnimation { duration: 800 }
         
-        // Update status
+        // Update status to "ACCESS GRANTED"
+        ScriptAction {
+            script: {
+                console.log("BunkerDoors: Updating to ACCESS GRANTED")
+                statusText.text = "ACCESS GRANTED"
+                statusText.color = "#4ade80"  // Green
+            }
+        }
+        
+        PauseAnimation { duration: 500 }
+        
+        // Update status to facility access
         ScriptAction {
             script: {
                 statusText.text = "FACILITY ACCESS AUTHORIZED"
-                statusText.color = "#a0cfff"
+                statusText.color = "#a0cfff"  // Blue
             }
         }
         
@@ -287,10 +296,73 @@ function resetDoors() {
         // Cleanup
         ScriptAction {
             script: {
+                console.log("BunkerDoors: Animation complete")
                 bunkerOverlay.visible = false
                 bunkerOverlay.opacity = 1.0
                 bunkerOverlay.animationActive = false
                 bunkerOverlay.animationComplete()
+                
+                // Reset status for next time
+                statusText.text = "AUTHENTICATING..."
+                statusText.color = "#ffc266"
+                statusOverlay.opacity = 0.9
+            }
+        }
+    }
+    
+    // Quick door close animation for failures
+    SequentialAnimation {
+        id: doorCloseAnimation
+        
+        // Update status to show failure
+        ScriptAction {
+            script: {
+                console.log("BunkerDoors: Showing ACCESS DENIED")
+                statusText.text = "ACCESS DENIED"
+                statusText.color = "#ef4444"  // Red
+            }
+        }
+        
+        // Quick slam back to closed position with bounce
+        ParallelAnimation {
+            NumberAnimation {
+                target: leftDoor
+                property: "x"
+                to: 0
+                duration: 600
+                easing.type: Easing.OutBack
+            }
+            NumberAnimation {
+                target: rightDoor
+                property: "x"
+                to: parent.width / 2 - 2
+                duration: 600
+                easing.type: Easing.OutBack
+            }
+        }
+        
+        // Brief pause showing failure
+        PauseAnimation { duration: 1500 }
+        
+        // Fade out and reset
+        NumberAnimation {
+            target: bunkerOverlay
+            property: "opacity"
+            to: 0.0
+            duration: 500
+        }
+        
+        ScriptAction {
+            script: {
+                console.log("BunkerDoors: Reset after failure")
+                visible = false
+                opacity = 1.0
+                animationActive = false
+                
+                // Reset status for next attempt
+                statusText.text = "AUTHENTICATING..."
+                statusText.color = "#ffc266"
+                statusOverlay.opacity = 0.9
             }
         }
     }
