@@ -158,8 +158,7 @@ Item {
             color: "#a0cfff"
             opacity: 0.3
             visible: bootStep >= 7
-        }
-        
+        }        
         // Authentication Section
         Column {
             width: parent.width
@@ -352,7 +351,7 @@ Item {
             
             // System Status
             Column {
-                width: (parent.width - 30) * 0.6
+                width: (parent.width - 30) * 0.3
                 spacing: 8
                 
                 Text {
@@ -411,10 +410,41 @@ Item {
                     }
                 }
             }
-            
-            // Controls
+            // Authentication Checklist Section  
+AuthenticationChecklist {
+    id: authChecklist
+    width: (parent.width -60) * 0.4
+    
+    // Update states based on input field changes
+    Component.onCompleted: {
+        // Connect to your existing input field changes
+        usernameInput.textChanged.connect(function() {
+            authChecklist.setUsernameComplete(usernameInput.text.length > 0)
+        })
+        
+        passwordInput.textChanged.connect(function() {
+            authChecklist.setPasswordComplete(passwordInput.text.length > 0)
+        })
+    }
+    
+    // Connect to SDDM authentication signals
+    Connections {
+        target: sddm
+        onLoginStarted: {
+            // Detect if FIDO challenge is initiated
+            authChecklist.startFidoChallenge(30)
+        }
+        onLoginSucceeded: {
+            authChecklist.completeFidoChallenge()
+        }
+        onLoginFailed: {
+            authChecklist.failFidoChallenge()
+        }
+    }
+}
+             // Controls
             Column {
-                width: (parent.width - 30) * 0.4
+                width: (parent.width - 60) * 0.3
                 spacing: 10
                 
                 Text {
