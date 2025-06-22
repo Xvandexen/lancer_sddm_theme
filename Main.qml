@@ -1,5 +1,6 @@
 import QtQuick 2.0
 import SddmComponents 2.0
+import Qt.labs.platform 1.1
 
 Rectangle {
     width: Screen.width
@@ -10,23 +11,70 @@ Rectangle {
     
     TextConstants { id: textConstants }
     
-    Connections {
-        target: sddm
-        onLoginSucceeded: {
-            console.log("LOGIN SUCCEEDED - continuing doors animation")
-            dataSlateHUD.systemStatus = "ACCESS GRANTED"
-            // Animation continues to completion
-        }
-        onLoginFailed: {
-            console.log("LOGIN FAILED - stopping and resetting doors")
-            dataSlateHUD.authenticationFailed = true
-            dataSlateHUD.systemStatus = "ACCESS DENIED"
-            // Stop and reset the doors animation
-            bunkerDoors.abortAnimation()
+    function launchExternalAnimation() {
+        console.log("Main: Launching external bunker doors animation")
+        
+        // Try to launch the external animation script
+        try {
+            var process = Qt.createQmlObject('
+                import Qt.labs.platform 1.1
+                Process {
+                    id: animationProcess
+                    program: "/usr/share/sddm/themes/lancer/bunker-doors-launcher.sh"
+                    
+                    onFinished: {
+                        console.log("Animation launcher finished with code:", exitCode)
+                    }
+                    
+                    onErrorOccurred: {
+                        console.log("Animation launcher error:", error)
+                    }
+                    
+                    Component.onCompleted: {
+                        console.log("Starting external animation process")
+                        start()
+                    }
+                }
+            ', root);
+        } catch (e) {
+            console.log("Failed to create external process:", e)
+            
+            // Fallback: try direct qml execution
+            try {
+                var fallbackProcess = Qt.createQmlObject('
+                    import Qt.labs.platform 1.1
+                    Process {
+                        program: "qml"
+                        arguments: ["/usr/share/sddm/themes/lancer/bunker-doors-standalone.qml"]
+                        
+                        Component.onCompleted: {
+                            console.log("Starting fallback QML process")
+                            startDetached()
+                        }
+                    }
+                ', root);
+            } catch (e2) {
+                console.log("Fallback process also failed:", e2)
+            }
         }
     }
     
-    // Temporary background - will be replaced with bunker door
+    Connections {
+        target: sddm
+        onLoginSucceeded: {
+            console.log("LOGIN SUCCEEDED - launching external animation")
+            dataSlateHUD.systemStatus = "ACCESS GRANTED"
+            // Launch the external animation that will survive SDDM termination
+            launchExternalAnimation()
+        }
+        onLoginFailed: {
+            console.log("LOGIN FAILED")
+            dataSlateHUD.authenticationFailed = true
+            dataSlateHUD.systemStatus = "ACCESS DENIED"
+        }
+    }
+    
+    // Background
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
@@ -79,13 +127,10 @@ Rectangle {
         anchors.rightMargin: 50
         anchors.verticalCenter: parent.verticalCenter
         
-        // Connect HUD signals to SDDM actions
+        // Connect HUD signals to SDDM actions (no animation logic here)
         onLoginRequested: {
-            console.log("Login requested - starting doors animation")
-            // Start animation BEFORE calling sddm.login
-            bunkerDoors.startAnimation()
-            // Brief delay then trigger actual login
-            loginDelayTimer.start()
+            console.log("Login requested - calling sddm.login")
+            sddm.login(username, password, sessionIndex)
         }
         
         onPowerOffRequested: {
@@ -94,30 +139,6 @@ Rectangle {
         
         onRebootRequested: {
             sddm.reboot()
-        }
-        
-        // Store login credentials for delayed execution
-        property string pendingUsername: ""
-        property string pendingPassword: ""
-        
-        // Timer to delay actual login call after animation starts
-        Timer {
-            id: loginDelayTimer
-            interval: 500  // Half second delay for animation to start
-            onTriggered: {
-                console.log("Executing delayed login")
-                sddm.login(dataSlateHUD.pendingUsername, dataSlateHUD.pendingPassword, sessionIndex)
-            }
-        }
-    }
-    
-    // Update the login signal connection to store credentials
-    Connections {
-        target: dataSlateHUD
-        onLoginRequested: {
-            // Store credentials for delayed execution
-            dataSlateHUD.pendingUsername = username
-            dataSlateHUD.pendingPassword = password
         }
     }
     
@@ -129,29 +150,10 @@ Rectangle {
         index: sessionModel.lastIndex
     }
     
-    // Bunker Doors Opening Animation - loads above everything
-    BunkerDoorsOverlay {
-        id: bunkerDoors
-        
-        onAnimationComplete: {
-            // Animation is complete, session should be started by now
-            // If needed, we could add additional cleanup here
-        }
-    }
-    
     // Focus management
     Component.onCompleted: {
         // Focus on the HUD when loaded
         dataSlateHUD.forceActiveFocus()
-        console.log("Lancer theme loaded - Press F12 to test bunker doors")
-    }
-    
-    // Test trigger for debugging
-    Keys.onPressed: {
-        if (event.key === Qt.Key_F12) {
-            console.log("F12 pressed - Testing bunker doors animation")
-            bunkerDoors.startAnimation()
-            event.accepted = true
-        }
+        console.log("Lancer theme loaded - external animation ready")
     }
 }
