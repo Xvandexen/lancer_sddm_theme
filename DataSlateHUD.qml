@@ -14,6 +14,7 @@ Item {
     property string currentTypingText: ""
     property int typingIndex: 0
     property bool isTyping: false
+    property var terminalHistory: []
     
     signal loginRequested(string username, string password)
     signal powerOffRequested()
@@ -21,33 +22,76 @@ Item {
     
     // Typing animation function
     function startTyping(text) {
-        if (!bootComplete) return
+        if (!bootComplete || isTyping) return
         currentTypingText = text
         typingIndex = 0
         isTyping = true
-        hoverFeedback.text = ""
+        
+        // Add new line to history
+        terminalHistory.push("")
+        updateTerminalDisplay()
         typingTimer.start()
+    }
+    
+    function updateTerminalDisplay() {
+        var displayText = ""
+        for (var i = 0; i < terminalHistory.length; i++) {
+            if (displayText !== "") displayText += "<br>"
+            
+            // Color code the terminal output
+            var line = terminalHistory[i]
+            if (line.indexOf("[COMP/CON:") !== -1) {
+                // COMP/CON responses - find and color the bracketed part
+                var beforeBracket = line.substring(0, line.indexOf("[COMP/CON:"))
+                var bracketStart = line.indexOf("[COMP/CON:")
+                var bracketEnd = line.indexOf("]", bracketStart) + 1
+                var bracketContent = line.substring(bracketStart, bracketEnd)
+                var afterBracket = line.substring(bracketEnd)
+                
+                displayText += '<span style="color: #6a8aa8;">' + beforeBracket + '</span>'
+                displayText += '<span style="color: #ffc266;">' + bracketContent + '</span>'
+                displayText += '<span style="color: #6a8aa8;">' + afterBracket + '</span>'
+            } else if (line.startsWith("$ ")) {
+                // Commands - $ in gray, command in blue
+                displayText += '<span style="color: #6a8aa8;">$ </span>'
+                displayText += '<span style="color: #a0cfff;">' + line.substring(2) + '</span>'
+            } else if (line.indexOf("WARNING:") !== -1 || line.indexOf("Failed to") !== -1) {
+                // Warnings/errors in yellow
+                displayText += '<span style="color: #ffc266;">' + line + '</span>'
+            } else {
+                // Default text in blue
+                displayText += '<span style="color: #a0cfff;">' + line + '</span>'
+            }
+        }
+        terminalOutput.text = displayText
+        
+        // Auto-scroll to bottom
+        terminalScroll.contentY = Math.max(0, terminalScroll.contentHeight - terminalScroll.height)
     }
     
     function stopTyping() {
         if (!bootComplete) return
         typingTimer.stop()
         isTyping = false
-        hoverFeedback.text = ""
     }
     
     // Typing timer
     Timer {
         id: typingTimer
-        interval: 30
+        interval: 15  // Faster typing - 15ms per character
         repeat: true
         onTriggered: {
             if (typingIndex < currentTypingText.length) {
-                hoverFeedback.text += currentTypingText.charAt(typingIndex)
+                // Update the last line in history with current typing progress
+                terminalHistory[terminalHistory.length - 1] = currentTypingText.substring(0, typingIndex + 1)
+                updateTerminalDisplay()
                 typingIndex++
             } else {
                 stop()
                 isTyping = false
+                // Final update to ensure complete text
+                terminalHistory[terminalHistory.length - 1] = currentTypingText
+                updateTerminalDisplay()
             }
         }
     }
@@ -66,24 +110,59 @@ Item {
             radius: 8
         }
         
-        // Thicker right edge for mounting connection
+        // Thicker right edge for mounting connection - extends to screen edge
         Rectangle {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            width: 12
+            width: 40  // Much thicker mounting bracket
             color: "#2a2e33"
             radius: 8
             
             // Right edge gradient for depth
             Rectangle {
                 anchors.fill: parent
-                anchors.margins: 1
-                radius: parent.radius - 1
+                anchors.margins: 2
+                radius: parent.radius - 2
                 gradient: Gradient {
                     GradientStop { position: 0.0; color: "#34383d" }
                     GradientStop { position: 0.5; color: "#2a2e33" }
                     GradientStop { position: 1.0; color: "#20242a" }
+                }
+            }
+            
+            // Extended mounting arm that reaches screen edge
+            Rectangle {
+                anchors.right: parent.right
+                anchors.rightMargin: -50  // Extends beyond the HUD
+                anchors.verticalCenter: parent.verticalCenter
+                width: 80  // Wide mounting arm
+                height: 20
+                color: "#2a2e33"
+                radius: 4
+                
+                // Mounting arm details
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: parent.width - 10
+                    height: 8
+                    color: "#1a1e23"
+                    radius: 2
+                }
+                
+                // Bolts/rivets on the mounting arm
+                Repeater {
+                    model: 4
+                    Rectangle {
+                        width: 6
+                        height: 6
+                        radius: 3
+                        color: "#4a4a4a"
+                        border.width: 1
+                        border.color: "#1a1a1a"
+                        x: 10 + index * 15
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
                 }
             }
         }
@@ -111,56 +190,68 @@ Item {
             }
         }
         
-        // Additional rivets along the right edge
+        // Additional rivets along the right mounting bracket
         Repeater {
-            model: 6
+            model: 8  // More rivets for the bigger bracket
             Rectangle {
-                width: 12
-                height: 12
+                width: 16
+                height: 16
                 color: "#2a2e33"
-                border.width: 1
+                border.width: 2
                 border.color: "#1a1a1a"
-                radius: 6
-                x: parent.width - 6
-                y: 50 + index * 150
+                radius: 8
+                x: parent.width - 20  // Positioned on the wider bracket
+                y: 60 + index * 120
                 
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 4
-                    height: 4
+                    width: 8
+                    height: 8
                     color: "#4a4a4a"
-                    radius: 2
+                    radius: 4
                 }
             }
         }
         
-        // Connection ports on right edge
+        // Connection ports on right mounting bracket
         Rectangle {
-            x: parent.width - 8
-            y: parent.height * 0.3
-            width: 16
-            height: 8
+            x: parent.width - 30
+            y: parent.height * 0.25
+            width: 20
+            height: 10
             color: "#1a1a1a"
-            radius: 4
-            border.width: 1
+            radius: 5
+            border.width: 2
             border.color: "#0a0a0a"
         }
         
         Rectangle {
-            x: parent.width - 8
-            y: parent.height * 0.7
-            width: 16
-            height: 8
+            x: parent.width - 30
+            y: parent.height * 0.5
+            width: 20
+            height: 10
             color: "#1a1a1a"
-            radius: 4
-            border.width: 1
+            radius: 5
+            border.width: 2
+            border.color: "#0a0a0a"
+        }
+        
+        Rectangle {
+            x: parent.width - 30
+            y: parent.height * 0.75
+            width: 20
+            height: 10
+            color: "#1a1a1a"
+            radius: 5
+            border.width: 2
             border.color: "#0a0a0a"
         }
         
         // Single unified frosted glass surface inside the steel frame
         Rectangle {
             anchors.fill: parent
-            anchors.margins: 12  // More margin for thicker frame
+            anchors.margins: 12
+            anchors.rightMargin: 50  // More margin for the bigger mounting bracket
             radius: 6
             
             // Steel blue frosted glass
@@ -174,6 +265,7 @@ Item {
             Column {
                 anchors.fill: parent
                 anchors.margins: 20
+                anchors.rightMargin: 60  // Extra margin to account for mounting bracket
                 spacing: 15
                 
                 // Header Section
@@ -271,7 +363,7 @@ Item {
                             text: "Initializing semantic manifold . . . " + (bootStep >= 1 ? "done" : "")
                             font.family: "Courier New, monospace"
                             font.pixelSize: 14
-                            color: "#a0cfff"  // Always blue
+                            color: "#6a8aa8"  // Gray system color
                             font.bold: bootStep < 1
                         }
                         
@@ -281,7 +373,7 @@ Item {
                                   bootStep >= 1 ? "Initializing logic gradients . . ." : ""
                             font.family: "Courier New, monospace"
                             font.pixelSize: 14
-                            color: "#a0cfff"  // Always blue
+                            color: "#6a8aa8"  // Gray system color
                             font.bold: bootStep >= 1 && bootStep < 2
                             visible: bootStep >= 1
                         }
@@ -291,7 +383,7 @@ Item {
                             text: bootStep >= 3 ? "1.0255EB FREE (3.6EB TOTAL)" : ""
                             font.family: "Courier New, monospace"
                             font.pixelSize: 14
-                            color: "#a0cfff"
+                            color: "#6a8aa8"
                             visible: bootStep >= 3
                         }
                         
@@ -300,7 +392,7 @@ Item {
                             text: bootStep >= 3 ? "KERNEL supported CPUs:" : ""
                             font.family: "Courier New, monospace"
                             font.pixelSize: 14
-                            color: "#a0cfff"
+                            color: "#6a8aa8"
                             visible: bootStep >= 3
                         }
                         
@@ -336,7 +428,7 @@ Item {
                             text: bootStep >= 4 ? "Establishing encrypted link (24::BLUE CASCADE) . . . done" : ""
                             font.family: "Courier New, monospace"
                             font.pixelSize: 14
-                            color: "#a0cfff"
+                            color: "#6a8aa8"
                             visible: bootStep >= 4
                         }
                         
@@ -355,7 +447,7 @@ Item {
                             text: bootStep >= 6 ? "No sensory bridge found // manual input mode enabled" : ""
                             font.family: "Courier New, monospace"
                             font.pixelSize: 14
-                            color: "#ffc266"  // Yellow for warnings only
+                            color: "#6a8aa8"  // Gray system color
                             visible: bootStep >= 6
                         }
                         
@@ -372,20 +464,22 @@ Item {
                             text: bootStep >= 7 ? ">//[COMP/CON: Authentication Required. Input Credentials.]" : ""
                             font.family: "Courier New, monospace"
                             font.pixelSize: 16
-                            color: "#a0cfff"
+                            color: "#a0cfff"  // COMP/CON messages in blue
                             font.bold: true
                             visible: bootStep >= 7
                         }
                         
-                        // Hover feedback messages - typing animation
+                        // Terminal output for hover interactions - accumulating history
                         Text {
-                            id: hoverFeedback
+                            id: terminalOutput
                             width: parent.width
                             text: ""
                             font.family: "Courier New, monospace"
-                            font.pixelSize: 14  // Normal size like other console text
-                            color: "#a0cfff"
+                            font.pixelSize: 14
+                            color: "#a0cfff"  // Commands in original blue
                             visible: text !== "" && bootComplete
+                            wrapMode: Text.Wrap
+                            textFormat: Text.RichText  // Enable rich text for color coding
                         }
                     }
                 }
@@ -460,9 +554,7 @@ Item {
                                 
                                 onActiveFocusChanged: {
                                     if (activeFocus && bootComplete) {
-                                        startTyping("Input buffer active: USERNAME field selected")
-                                    } else if (!passwordInput.activeFocus) {
-                                        stopTyping()
+                                        startTyping("$ gms-cc-subsys --init-input-buffer username")
                                     }
                                 }
                             }
@@ -475,14 +567,12 @@ Item {
                                 
                                 onEntered: {
                                     if (!usernameInput.activeFocus && bootComplete && !isTyping) {
-                                        startTyping("Hovering: USERNAME input field - click to activate")
+                                        startTyping("$ hover-detect auth-field --type=username")
                                     }
                                 }
                                 
                                 onExited: {
-                                    if (!usernameInput.activeFocus) {
-                                        stopTyping()
-                                    }
+                                    // Don't clear on exit - let terminal accumulate
                                 }
                             }
                         }
@@ -545,9 +635,7 @@ Item {
                                 
                                 onActiveFocusChanged: {
                                     if (activeFocus && bootComplete) {
-                                        startTyping("Input buffer active: PASSWORD field selected - press ENTER to authenticate")
-                                    } else if (!usernameInput.activeFocus) {
-                                        stopTyping()
+                                        startTyping("$ gms-cc-subsys --init-input-buffer password --encrypted")
                                     }
                                 }
                             }
@@ -560,14 +648,12 @@ Item {
                                 
                                 onEntered: {
                                     if (!passwordInput.activeFocus && bootComplete && !isTyping) {
-                                        startTyping("Hovering: PASSWORD input field - click to activate")
+                                        startTyping("$ hover-detect auth-field --type=password --secure")
                                     }
                                 }
                                 
                                 onExited: {
-                                    if (!passwordInput.activeFocus) {
-                                        stopTyping()
-                                    }
+                                    // Don't clear on exit - let terminal accumulate
                                 }
                             }
                         }
@@ -709,14 +795,12 @@ Item {
                                 
                                 onEntered: {
                                     if (bootComplete && !isTyping) {
-                                        startTyping("Hovering: LOGIN button - execute authentication sequence")
+                                        startTyping("$ omninet-auth --execute --pilot=" + (usernameInput.text || "[NULL]"))
                                     }
                                 }
                                 
                                 onExited: {
-                                    if (!usernameInput.activeFocus && !passwordInput.activeFocus) {
-                                        stopTyping()
-                                    }
+                                    // Don't clear on exit - let terminal accumulate
                                 }
                             }
                         }
@@ -762,14 +846,12 @@ Item {
                                     
                                     onEntered: {
                                         if (bootComplete && !isTyping) {
-                                            startTyping("WARNING: SHUTDOWN command - system will power down")
+                                            startTyping("$ gms-power-mgmt --shutdown --emergency")
                                         }
                                     }
                                     
                                     onExited: {
-                                        if (!usernameInput.activeFocus && !passwordInput.activeFocus) {
-                                            stopTyping()
-                                        }
+                                        // Don't clear on exit - let terminal accumulate
                                     }
                                 }
                             }
@@ -811,14 +893,12 @@ Item {
                                     
                                     onEntered: {
                                         if (bootComplete && !isTyping) {
-                                            startTyping("WARNING: REBOOT command - system will restart")
+                                            startTyping("$ gms-power-mgmt --reboot --safe-init")
                                         }
                                     }
                                     
                                     onExited: {
-                                        if (!usernameInput.activeFocus && !passwordInput.activeFocus) {
-                                            stopTyping()
-                                        }
+                                        // Don't clear on exit - let terminal accumulate
                                     }
                                 }
                             }
