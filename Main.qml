@@ -10,19 +10,26 @@ Rectangle {
     
     TextConstants { id: textConstants }
     
-    Connections {
-        target: sddm
-        onLoginSucceeded: {
-            dataSlateHUD.systemStatus = "ACCESS GRANTED"
-            // Start the bunker doors opening animation
-            bunkerDoors.startAnimation()
-        }
-        onLoginFailed: {
-            dataSlateHUD.authenticationFailed = true
-            dataSlateHUD.systemStatus = "ACCESS DENIED"
-        }
+   Connections {
+    target: sddm
+    onLoginStarted: {
+        console.log("LOGIN STARTED - Starting bunker doors animation")
+        dataSlateHUD.systemStatus = "AUTHENTICATING..."
+        bunkerDoors.startAnimation()
     }
-    
+    onLoginSucceeded: {
+        console.log("LOGIN SUCCEEDED")
+        dataSlateHUD.systemStatus = "ACCESS GRANTED"
+        // Animation continues to completion
+    }
+    onLoginFailed: {
+        console.log("LOGIN FAILED - Stopping/resetting bunker doors")
+        dataSlateHUD.authenticationFailed = true
+        dataSlateHUD.systemStatus = "ACCESS DENIED"
+        // Stop animation and reset doors
+        bunkerDoors.resetDoors()
+    }
+}    
     // Temporary background - will be replaced with bunker door
     Rectangle {
         anchors.fill: parent

@@ -12,7 +12,18 @@ Item {
     property bool animationActive: false
     
     signal animationComplete()
-    
+
+function resetDoors() {
+    console.log("BunkerDoors: Resetting after failed login")
+    doorsOpeningAnimation.stop()
+    visible = false
+    animationActive = false
+    opacity = 1.0
+    // Reset door positions
+    leftDoor.x = 0
+    rightDoor.x = parent.width / 2 - 2
+    statusOverlay.opacity = 0.9
+}    
     function startAnimation() {
         visible = true
         animationActive = true
