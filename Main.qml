@@ -113,4 +113,12 @@ Rectangle {
         // Focus on the HUD when loaded
         dataSlateHUD.forceActiveFocus()
     }
+        // Add this after the Component.onCompleted block
+Keys.onPressed: {
+    if (event.key === Qt.Key_F12) {
+        console.log("F12 pressed - Testing bunker doors animation")
+        bunkerDoors.startAnimation()
+        event.accepted = true
+    }
+}
 }
